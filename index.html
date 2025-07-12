@@ -1872,6 +1872,26 @@
         // Mobile video compatibility fix for WeChat and other strict browsers
         function initializeVideoCompatibility() {
             const videos = document.querySelectorAll('video');
+            let hasUserInteracted = false;
+            
+            // Single document-level interaction handler to enable video playback
+            const enableVideoPlayback = () => {
+                if (hasUserInteracted) return;
+                hasUserInteracted = true;
+                
+                // Only try to play videos that are actually paused and ready
+                videos.forEach(video => {
+                    if (video.paused && video.readyState >= 2) { // HAVE_CURRENT_DATA or better
+                        video.play().catch(() => {
+                            // If autoplay fails, that's okay - user can manually play
+                        });
+                    }
+                });
+                
+                // Remove the document-level listeners after first interaction
+                document.removeEventListener('touchstart', enableVideoPlayback);
+                document.removeEventListener('click', enableVideoPlayback);
+            };
             
             videos.forEach(video => {
                 // Force video properties for mobile compatibility
@@ -1884,20 +1904,12 @@
                 
                 // Multiple autoplay attempts for different browsers
                 const attemptPlay = () => {
-                    if (video.paused) {
+                    if (video.paused && video.readyState >= 2) {
                         const playPromise = video.play();
                         if (playPromise !== undefined) {
                             playPromise.catch(error => {
-                                console.log('Autoplay prevented, trying again...', error);
-                                // Try again after a short delay
-                                setTimeout(() => {
-                                    if (video.paused) {
-                                        video.play().catch(() => {
-                                            // Final fallback: show controls for manual play
-                                            video.controls = true;
-                                        });
-                                    }
-                                }, 500);
+                                console.log('Autoplay prevented for video:', error);
+                                // Don't retry automatically - let user interaction handle it
                             });
                         }
                     }
@@ -1908,23 +1920,22 @@
                 video.addEventListener('canplay', attemptPlay);
                 video.addEventListener('canplaythrough', attemptPlay);
                 
-                // Force load and play on touch/click (for strict mobile browsers)
-                const forcePlay = () => {
-                    video.load();
-                    attemptPlay();
-                    document.removeEventListener('touchstart', forcePlay);
-                    document.removeEventListener('click', forcePlay);
-                };
-                
-                document.addEventListener('touchstart', forcePlay, { once: true });
-                document.addEventListener('click', forcePlay, { once: true });
+                // Video-specific click handler that doesn't reload the video
+                video.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent event bubbling
+                    if (video.paused) {
+                        video.play().catch(() => {});
+                    } else {
+                        video.pause();
+                    }
+                });
                 
                 // Intersection Observer for lazy loading/playing
                 if ('IntersectionObserver' in window) {
                     const observer = new IntersectionObserver((entries) => {
                         entries.forEach(entry => {
                             if (entry.isIntersecting) {
-                                entry.target.load();
+                                // Don't call video.load() here - it causes restart
                                 attemptPlay();
                                 observer.unobserve(entry.target);
                             }
@@ -1934,6 +1945,10 @@
                     observer.observe(video);
                 }
             });
+            
+            // Add single document-level listeners for initial user interaction
+            document.addEventListener('touchstart', enableVideoPlayback, { once: true });
+            document.addEventListener('click', enableVideoPlayback, { once: true });
         }
         
         // Initialize video compatibility on page load

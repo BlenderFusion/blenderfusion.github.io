@@ -1873,25 +1873,7 @@
         function initializeVideoCompatibility() {
             const videos = document.querySelectorAll('video');
             let hasUserInteracted = false;
-            
-            // Single document-level interaction handler to enable video playback
-            const enableVideoPlayback = () => {
-                if (hasUserInteracted) return;
-                hasUserInteracted = true;
-                
-                // Only try to play videos that are actually paused and ready
-                videos.forEach(video => {
-                    if (video.paused && video.readyState >= 2) { // HAVE_CURRENT_DATA or better
-                        video.play().catch(() => {
-                            // If autoplay fails, that's okay - user can manually play
-                        });
-                    }
-                });
-                
-                // Remove the document-level listeners after first interaction
-                document.removeEventListener('touchstart', enableVideoPlayback);
-                document.removeEventListener('click', enableVideoPlayback);
-            };
+            let isProcessingUserInteraction = false;
             
             videos.forEach(video => {
                 // Force video properties for mobile compatibility
@@ -1904,12 +1886,20 @@
                 
                 // Multiple autoplay attempts for different browsers
                 const attemptPlay = () => {
-                    if (video.paused && video.readyState >= 2) {
+                    if (video.paused) {
                         const playPromise = video.play();
                         if (playPromise !== undefined) {
                             playPromise.catch(error => {
                                 console.log('Autoplay prevented for video:', error);
-                                // Don't retry automatically - let user interaction handle it
+                                // Try again after a short delay for strict browsers
+                                setTimeout(() => {
+                                    if (video.paused) {
+                                        video.play().catch(() => {
+                                            // Final fallback: show controls for manual play
+                                            video.controls = true;
+                                        });
+                                    }
+                                }, 500);
                             });
                         }
                     }
@@ -1930,12 +1920,46 @@
                     }
                 });
                 
+                // Force load and play on touch/click (for strict mobile browsers like WeChat)
+                // Each video gets its own handler, but we coordinate them globally
+                const forcePlay = () => {
+                    // Global coordination to prevent multiple simultaneous loads
+                    if (isProcessingUserInteraction) return;
+                    isProcessingUserInteraction = true;
+                    
+                    // Only load if the video is actually paused and needs help
+                    // Don't reload videos that are already playing!
+                    if (video.paused && video.readyState < 2) {
+                        video.load();
+                    }
+                    attemptPlay();
+                    
+                    // Clean up this video's listeners
+                    document.removeEventListener('touchstart', forcePlay);
+                    document.removeEventListener('click', forcePlay);
+                    
+                    // Mark that user has interacted and reset processing flag
+                    hasUserInteracted = true;
+                    setTimeout(() => {
+                        isProcessingUserInteraction = false;
+                    }, 100);
+                };
+                
+                // Only add document listeners if user hasn't interacted yet
+                if (!hasUserInteracted) {
+                    document.addEventListener('touchstart', forcePlay, { once: true });
+                    document.addEventListener('click', forcePlay, { once: true });
+                }
+                
                 // Intersection Observer for lazy loading/playing
                 if ('IntersectionObserver' in window) {
                     const observer = new IntersectionObserver((entries) => {
                         entries.forEach(entry => {
                             if (entry.isIntersecting) {
-                                // Don't call video.load() here - it causes restart
+                                // Only load if user hasn't interacted yet and video needs it
+                                if (!hasUserInteracted && video.readyState < 2) {
+                                    video.load();
+                                }
                                 attemptPlay();
                                 observer.unobserve(entry.target);
                             }
@@ -1945,10 +1969,6 @@
                     observer.observe(video);
                 }
             });
-            
-            // Add single document-level listeners for initial user interaction
-            document.addEventListener('touchstart', enableVideoPlayback, { once: true });
-            document.addEventListener('click', enableVideoPlayback, { once: true });
         }
         
         // Initialize video compatibility on page load

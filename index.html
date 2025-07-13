@@ -1927,19 +1927,33 @@
                     if (isProcessingUserInteraction) return;
                     isProcessingUserInteraction = true;
                     
-                    // Only load if the video is actually paused and needs help
-                    // Don't reload videos that are already playing!
-                    if (video.paused && video.readyState < 2) {
-                        video.load();
+                    // After first user interaction, try to enable ALL videos
+                    if (!hasUserInteracted) {
+                        hasUserInteracted = true;
+                        
+                        // Enable all videos after first interaction
+                        videos.forEach(v => {
+                            if (v.paused && v.readyState < 2) {
+                                v.load();
+                            }
+                            // Try to play each video
+                            if (v.paused) {
+                                v.play().catch(() => {});
+                            }
+                        });
+                    } else {
+                        // For subsequent interactions, just handle this specific video
+                        if (video.paused && video.readyState < 2) {
+                            video.load();
+                        }
+                        attemptPlay();
                     }
-                    attemptPlay();
                     
                     // Clean up this video's listeners
                     document.removeEventListener('touchstart', forcePlay);
                     document.removeEventListener('click', forcePlay);
                     
-                    // Mark that user has interacted and reset processing flag
-                    hasUserInteracted = true;
+                    // Reset processing flag
                     setTimeout(() => {
                         isProcessingUserInteraction = false;
                     }, 100);

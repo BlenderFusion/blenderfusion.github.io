@@ -2140,14 +2140,21 @@ div.takeaway-tags img {
     gap: 20px;
     align-items: center;
     text-align: center;
+    width: 120%;
+    margin-left: -10%;
+    box-sizing: border-box;
+    overflow-x: hidden;
 }
 
 .demo-video {
     width: 100%;
+    max-width: 100%;
+    height: auto;
     border-radius: 12px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
     background-color: #000;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
+    box-sizing: border-box;
 }
 
 .demo-video:hover {
@@ -2165,7 +2172,12 @@ div.takeaway-tags img {
     max-width: 800px;
 }
 
-/* Responsive Design for TL;DR */
+/* Responsive Design for TL;DR - Consistent with other content elements */
+.tldr-section {
+    overflow-x: hidden;
+}
+
+/* Follow standard content width pattern: 120% → 100% at mobile */
 @media (max-width: 768px) {
     .tldr-section {
         padding: 30px 0;
@@ -2176,6 +2188,8 @@ div.takeaway-tags img {
     }
     
     .tldr-content {
+        width: 100%;
+        margin-left: 0;
         gap: 18px;
     }
     
@@ -2193,7 +2207,11 @@ div.takeaway-tags img {
         padding: 0 12px;
     }
     
-
+    .tldr-content {
+        width: 100%;
+        margin-left: 0;
+        max-width: 100%;
+    }
     
     .video-caption {
         font-size: 0.95rem;
